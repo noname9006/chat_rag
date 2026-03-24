@@ -547,12 +547,37 @@ function intelligentSample(messages, count) {
 // 6. EXHAUSTIVE BATCH ANALYSIS (HYBRID PROMPTS)
 // ============================================================================
 
+function chunkByTime(messages, maxSize = 120, gapMinutes = 120) {
+    if (!messages || messages.length === 0) return [];
+    const chunks = [];
+    let current = [messages[0]];
+    for (let i = 1; i < messages.length; i++) {
+        const gap = (messages[i].date - messages[i-1].date) / 60000;
+        if (gap > gapMinutes || current.length >= maxSize) {
+            chunks.push(current);
+            current = [];
+        }
+        current.push(messages[i]);
+    }
+    if (current.length) chunks.push(current);
+    return chunks;
+}
+
 async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 120) {
     console.log(`\n📊 Exhaustive analysis of ${messages.length} messages (batches of ${batchSize})`);
     
+    const overlap = 20;
+    const timeChunks = chunkByTime(messages, batchSize, 120);
     const batches = [];
-    for (let i = 0; i < messages.length; i += batchSize) {
-        batches.push(messages.slice(i, i + batchSize));
+    for (const chunk of timeChunks) {
+        if (chunk.length <= batchSize) {
+            batches.push(chunk);
+        } else {
+            for (let i = 0; i < chunk.length; i += batchSize - overlap) {
+                batches.push(chunk.slice(i, i + batchSize));
+                if (i + batchSize >= chunk.length) break;
+            }
+        }
     }
     
     console.log(`   Total batches: ${batches.length}\n`);
@@ -568,7 +593,7 @@ async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 120) {
         const prompt = `You are analyzing Russian-language fintech community chat (batch ${batchNum}/${batches.length}).
 
 Messages in Russian (${batch.length} total):
-${batch.map(m => `${m.author}: ${m.text.substring(0, 150)}`).join('\n')}
+${batch.map(m => `${m.author}: ${m.text.substring(0, 300)}`).join('\n')}
 
 Extract ALL mentions in JSON format (field names in English, content values in Russian):
 {
