@@ -1,0 +1,260 @@
+{
+ "name": "Fintech & Banking EU - Chat",
+ "type": "private_supergroup",
+ "id": 1916527029,
+ "messages": [
+  {
+   "id": 1,
+   "type": "service",
+   "date": "2023-08-08T14:13:55",
+   "date_unixtime": "1691529235",
+   "actor": "Fintech & Banking EU - Chat",
+   "actor_id": "channel1916527029",
+   "action": "migrate_from_group",
+   "title": "Финтехи и Банки ЕС",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 2,
+   "type": "service",
+   "date": "2023-08-08T14:26:06",
+   "date_unixtime": "1691529966",
+   "actor": "Sergey",
+   "actor_id": "user222827411",
+   "action": "join_group_by_link",
+   "inviter": "Group",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 4,
+   "type": "message",
+   "date": "2023-08-08T14:33:29",
+   "date_unixtime": "1691530409",
+   "edited": "2023-08-08T14:38:41",
+   "edited_unixtime": "1691530721",
+   "from": "Artem",
+   "from_id": "user227593186",
+   "text": "Правила придумаю походу. Пока можно обо всем",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Правила придумаю походу. Пока можно обо всем"
+    }
+   ],
+   "reactions": [
+     {
+      "type": "emoji",
+      "count": 3,
+      "emoji": "😁",
+      "recent": [
+       {
+        "from": "DmitriiFR",
+        "from_id": "user695450385",
+        "date": "2025-12-28T12:42:44"
+       },
+       {
+        "from": "Yana Sadovskaya",
+        "from_id": "user144234",
+        "date": "2023-08-09T06:31:52"
+       },
+       {
+        "from": null,
+        "from_id": "user266259606",
+        "date": "2023-08-08T14:38:41"
+       }
+      ]
+     }
+    ]
+  },
+  {
+   "id": 5,
+   "type": "message",
+   "date": "2023-08-08T14:33:42",
+   "date_unixtime": "1691530422",
+   "edited": "2023-08-08T14:38:43",
+   "edited_unixtime": "1691530723",
+   "from": "Artem",
+   "from_id": "user227593186",
+   "text": "И оффтопить и флудить",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "И оффтопить и флудить"
+    }
+   ],
+   "reactions": [
+     {
+      "type": "emoji",
+      "count": 2,
+      "emoji": "🔥",
+      "recent": [
+       {
+        "from": "DmitriiFR",
+        "from_id": "user695450385",
+        "date": "2025-05-14T09:41:36"
+       },
+       {
+        "from": null,
+        "from_id": "user266259606",
+        "date": "2023-08-08T14:38:43"
+       }
+      ]
+     }
+    ]
+  },
+  {
+   "id": 6,
+   "type": "service",
+   "date": "2023-08-08T14:38:23",
+   "date_unixtime": "1691530703",
+   "actor": null,
+   "actor_id": "user266259606",
+   "action": "join_group_by_link",
+   "inviter": "Group",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 7,
+   "type": "message",
+   "date": "2023-08-08T14:41:23",
+   "date_unixtime": "1691530883",
+   "from": "Artem",
+   "from_id": "user227593186",
+   "text": [
+    {
+     "type": "mention",
+     "text": "@jesuisartemi"
+    },
+    " короче ты как самый знаток ЕС финтехов, что порекомендовал бы открыть помимо Революта и вайза?"
+   ],
+   "text_entities": [
+    {
+     "type": "mention",
+     "text": "@jesuisartemi"
+    },
+    {
+     "type": "plain",
+     "text": " короче ты как самый знаток ЕС финтехов, что порекомендовал бы открыть помимо Революта и вайза?"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "type": "service",
+   "date": "2023-08-08T14:41:35",
+   "date_unixtime": "1691530895",
+   "actor": "Pavel",
+   "actor_id": "user151509093",
+   "action": "join_group_by_link",
+   "inviter": "Group",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 9,
+   "type": "message",
+   "date": "2023-08-08T14:42:00",
+   "date_unixtime": "1691530920",
+   "from": "Artem",
+   "from_id": "user227593186",
+   "text": "На мой взгляд и Револют и вайз прям мастхев. Очень много задач решают",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "На мой взгляд и Револют и вайз прям мастхев. Очень много задач решают"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "type": "message",
+   "date": "2023-08-08T14:42:26",
+   "date_unixtime": "1691530946",
+   "from": "Artem",
+   "from_id": "user227593186",
+   "text": "Но мне не хватает чего-то для кешбеков или депозитов",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Но мне не хватает чего-то для кешбеков или депозитов"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "type": "message",
+   "date": "2023-08-08T14:43:33",
+   "date_unixtime": "1691531013",
+   "from": "Artem",
+   "from_id": "user227593186",
+   "text": "Странно что Револют не может депозиты давать, хотя это же прям лицензированный банк",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Странно что Револют не может депозиты давать, хотя это же прям лицензированный банк"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "type": "service",
+   "date": "2023-08-08T14:44:30",
+   "date_unixtime": "1691531070",
+   "actor": "Ross B.",
+   "actor_id": "user192599553",
+   "action": "join_group_by_link",
+   "inviter": "Group",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 13,
+   "type": "message",
+   "date": "2023-08-08T14:45:15",
+   "date_unixtime": "1691531115",
+   "from": "Ross B.",
+   "from_id": "user192599553",
+   "reply_to_message_id": 9,
+   "text": "Мне вайз прислал аж 2 ЕВРО кешбэка за остаток на счёте)))  ни в чем себе не отказываю как говорится",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Мне вайз прислал аж 2 ЕВРО кешбэка за остаток на счёте)))  ни в чем себе не отказываю как говорится"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "type": "message",
+   "date": "2023-08-08T14:45:21",
+   "date_unixtime": "1691531121",
+   "from": "Katerina Rodimova",
+   "from_id": "user100659790",
+   "reply_to_message_id": 11,
+   "text": "расскажите мне про ib",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "расскажите мне про ib"
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "type": "message",
+   "date": "2023-08-08T14:45:50",
+   "date_unixtime": "1691531150",
+   "from": "Artem",
+   "from_id": "user227593186",
+   "reply_to_message_id": 13,
+   "text": "Ну там в общем неплохие проценты то на самом деле. Уровень банковских депозитов в ЕС",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Ну там в общем неплохие проценты то на самом деле. Уровень банковских депозитов в ЕС"
+    }
+   ]
+  },
