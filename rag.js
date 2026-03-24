@@ -566,16 +566,14 @@ function chunkByTime(messages, maxSize = 120, gapMinutes = 120) {
 async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 120) {
     console.log(`\n📊 Exhaustive analysis of ${messages.length} messages (batches of ${batchSize})`);
     
-    const overlap = 20;
     const timeChunks = chunkByTime(messages, batchSize, 120);
     const batches = [];
     for (const chunk of timeChunks) {
         if (chunk.length <= batchSize) {
             batches.push(chunk);
         } else {
-            for (let i = 0; i < chunk.length; i += batchSize - overlap) {
+            for (let i = 0; i < chunk.length; i += batchSize) {
                 batches.push(chunk.slice(i, i + batchSize));
-                if (i + batchSize >= chunk.length) break;
             }
         }
     }
