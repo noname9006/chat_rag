@@ -429,7 +429,7 @@ Answer in Russian, be concise and factual.`;
                 body: JSON.stringify({
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.3,
-                    max_tokens: 1024
+                    max_tokens: 2048
                 })
             });
             
@@ -563,6 +563,44 @@ function chunkByTime(messages, maxSize = 120, gapMinutes = 120) {
     return chunks;
 }
 
+function tryRepairJson(raw) {
+    // Attempt 1: direct parse of the whole response
+    try { return JSON.parse(raw); } catch {}
+
+    // Extract the JSON object from the response
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    let str = match[0];
+
+    // Attempt 2: parse the extracted object as-is
+    try { return JSON.parse(str); } catch {}
+
+    // Attempt 3: sanitize control characters inside strings
+    // Replace literal control chars that are invalid in JSON strings
+    str = str.replace(/[\x00-\x1F\x7F]/g, (c) => {
+        const map = { '\n': '\\n', '\r': '\\r', '\t': '\\t' };
+        return map[c] !== undefined ? map[c] : '';
+    });
+    try { return JSON.parse(str); } catch {}
+
+    // Attempt 4: fix truncated JSON — strip the last incomplete entry and close brackets
+    let fixed = str;
+    // Remove trailing incomplete string value: ,"key": "incomplete...
+    fixed = fixed.replace(/,\s*"[^"\\]*(?:\\.[^"\\]*)*"\s*:\s*"[^"]*$/, '');
+    // Remove trailing incomplete array element: ,"incomplete...
+    fixed = fixed.replace(/,\s*"[^"]*$/, '');
+    // Remove trailing comma before closing
+    fixed = fixed.replace(/,\s*$/, '');
+    // Count unclosed brackets and braces
+    const opens = (fixed.match(/\[/g) || []).length - (fixed.match(/\]/g) || []).length;
+    const objOpens = (fixed.match(/\{/g) || []).length - (fixed.match(/\}/g) || []).length;
+    for (let i = 0; i < opens; i++) fixed += ']';
+    for (let i = 0; i < objOpens; i++) fixed += '}';
+    try { return JSON.parse(fixed); } catch {}
+
+    return null;
+}
+
 async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 120) {
     console.log(`\n📊 Exhaustive analysis of ${messages.length} messages (batches of ${batchSize})`);
     
@@ -606,20 +644,17 @@ Be maximally detailed. Output JSON only, no explanations.`;
 
         const response = await analyzer.analyzeRaw(prompt);
         
-        try {
-            const jsonMatch = response.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                batchAnalyses.push({
-                    batchNumber: batchNum,
-                    messageCount: batch.length,
-                    startDate: batch[0].date,
-                    endDate: batch[batch.length - 1].date,
-                    data: parsed
-                });
-            }
-        } catch (e) {
-            console.log(`\n      ⚠️  Batch ${batchNum}: JSON parsing error - ${e.message}`);
+        const parsed = tryRepairJson(response);
+        if (parsed) {
+            batchAnalyses.push({
+                batchNumber: batchNum,
+                messageCount: batch.length,
+                startDate: batch[0].date,
+                endDate: batch[batch.length - 1].date,
+                data: parsed
+            });
+        } else {
+            console.log(`\n      ⚠️  Batch ${batchNum}: JSON parsing failed after all repair attempts`);
             batchAnalyses.push({
                 batchNumber: batchNum,
                 messageCount: batch.length,
@@ -794,20 +829,17 @@ JSON only, no explanations.`;
 
         const response = await analyzer.analyzeRaw(prompt);
         
-        try {
-            const jsonMatch = response.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                weeklySummaries.push({
-                    week: weekLabel,
-                    totalMessages: weekData.totalMessages,
-                    daysAnalyzed: weekData.days.length,
-                    dailyDetails: weekData.days,
-                    weekSummary: parsed
-                });
-            }
-        } catch (e) {
-            console.log(`         ⚠️  Parsing error: ${e.message}`);
+        const parsed = tryRepairJson(response);
+        if (parsed) {
+            weeklySummaries.push({
+                week: weekLabel,
+                totalMessages: weekData.totalMessages,
+                daysAnalyzed: weekData.days.length,
+                dailyDetails: weekData.days,
+                weekSummary: parsed
+            });
+        } else {
+            console.log(`         ⚠️  Week ${weekLabel}: JSON parsing failed after all repair attempts`);
             weeklySummaries.push({
                 week: weekLabel,
                 totalMessages: weekData.totalMessages,
@@ -877,13 +909,11 @@ JSON only, no explanations.`;
 
     const response = await analyzer.analyzeRaw(prompt);
     
-    try {
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
-        }
-    } catch (e) {
-        console.log(`   ⚠️  Monthly summary parsing error: ${e.message}`);
+    const parsed = tryRepairJson(response);
+    if (parsed) {
+        return parsed;
+    } else {
+        console.log(`   ⚠️  Monthly summary parsing failed after all repair attempts`);
     }
     
     return {
@@ -1078,12 +1108,9 @@ JSON only, no explanations.`;
 
     const response = await analyzer.analyzeRaw(prompt);
     
-    try {
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
-    } catch (e) {
-        console.log(`   ⚠️  Global summary parsing error: ${e.message}`);
-    }
+    const parsed = tryRepairJson(response);
+    if (parsed) return parsed;
+    console.log(`   ⚠️  Global summary parsing failed after all repair attempts`);
     
     return {
         overall_narrative: 'Сводка обсуждений финтех-сообщества',
@@ -1168,19 +1195,16 @@ JSON only, no explanations.`;
 
     const response = await analyzer.analyzeRaw(prompt);
     
-    try {
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            return {
-                monthLabel: month.monthLabel,
-                totalMessages: month.messages.length,
-                sampledMessages: sample.length,
-                data: parsed
-            };
-        }
-    } catch (e) {
-        console.log(`   ⚠️  Parsing error: ${e.message}`);
+    const parsed = tryRepairJson(response);
+    if (parsed) {
+        return {
+            monthLabel: month.monthLabel,
+            totalMessages: month.messages.length,
+            sampledMessages: sample.length,
+            data: parsed
+        };
+    } else {
+        console.log(`   ⚠️  Parsing failed after all repair attempts`);
     }
     
     return {
