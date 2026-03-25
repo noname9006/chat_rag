@@ -643,7 +643,7 @@ function tryRepairJson(raw) {
     return null;
 }
 
-async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 80) {
+async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 40) {
     console.log(`\n📊 Exhaustive analysis of ${messages.length} messages (batches of ${batchSize})`);
     
     const timeChunks = chunkByTime(messages, batchSize, 120);
@@ -1065,7 +1065,7 @@ async function exhaustiveMonthAnalysis(month, analyzer) {
         dailySummaries: dailySummaries,
         weeklySummaries: weeklySummaries,
         monthSummary: monthSummary,
-        coverage: `${batchAnalyses.length * 80} messages analyzed (~${Math.round(batchAnalyses.length * 80 / month.messages.length * 100)}%)`
+        coverage: `${batchAnalyses.length * 40} messages analyzed (~${Math.round(batchAnalyses.length * 40 / month.messages.length * 100)}%)`
     };
 }
 
