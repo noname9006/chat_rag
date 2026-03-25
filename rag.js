@@ -416,7 +416,7 @@ Answer in Russian, be concise and factual.`;
     }
     
     async analyzeRaw(prompt) {
-        const estimatedInputTokens = Math.ceil(prompt.length / 3.5);
+        const estimatedInputTokens = Math.ceil(prompt.length / 2);
         const availableTokens = this.contextLimit - estimatedInputTokens - 300; // 300 safety buffer
         const outputTokens = Math.min(4000, Math.max(512, availableTokens));
 
@@ -424,15 +424,22 @@ Answer in Russian, be concise and factual.`;
             console.warn(`⚠️  Prompt close to limit! (~${estimatedInputTokens} tokens)`);
         }
 
+        const isJsonOnlyRequest = prompt.includes('JSON only') || prompt.includes('Output JSON only');
+
+        const requestBody = {
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+            max_tokens: outputTokens
+        };
+        if (isJsonOnlyRequest) {
+            requestBody.response_format = { type: 'json_object' };
+        }
+
         try {
             const response = await fetch(`${this.baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    messages: [{ role: 'user', content: prompt }],
-                    temperature: 0.3,
-                    max_tokens: outputTokens
-                })
+                body: JSON.stringify(requestBody)
             });
             
             if (!response.ok) {
@@ -440,6 +447,11 @@ Answer in Russian, be concise and factual.`;
             }
             
             const data = await response.json();
+
+            if (data.usage?.total_tokens === 0) {
+                throw new Error('Client disconnected during generation (total_tokens=0)');
+            }
+
             return data.choices[0].message.content;
         } catch (error) {
             return `❌ LM Studio connection error: ${error.message}\n\nCheck that LM Studio is running on http://localhost:1234`;
@@ -565,14 +577,36 @@ function chunkByTime(messages, maxSize = 120, gapMinutes = 120) {
     return chunks;
 }
 
+function extractFirstJsonObject(raw) {
+    const start = raw.indexOf('{');
+    if (start === -1) return null;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < raw.length; i++) {
+        const ch = raw[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\' && inString) { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+            depth--;
+            if (depth === 0) return raw.slice(start, i + 1);
+        }
+    }
+    // Unterminated — return everything from start (for truncation repair)
+    return raw.slice(start);
+}
+
 function tryRepairJson(raw) {
     // Attempt 1: direct parse of the whole response
     try { return JSON.parse(raw); } catch {}
 
-    // Extract the JSON object from the response
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    let str = match[0];
+    // Extract the first complete JSON object using balanced-brace scanning
+    const extracted = extractFirstJsonObject(raw);
+    if (!extracted) return null;
+    let str = extracted;
 
     // Attempt 2: parse the extracted object as-is
     try { return JSON.parse(str); } catch {}
@@ -621,17 +655,20 @@ async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 80) {
     console.log(`   Total batches: ${batches.length}\n`);
     
     const batchAnalyses = [];
-    
-    for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        const batchNum = i + 1;
-        
-        process.stdout.write(`\r   Batch ${batchNum}/${batches.length} (${batch.length} messages)...`);
-        
-        const prompt = `You are analyzing Russian-language fintech community chat (batch ${batchNum}/${batches.length}).
 
-Messages in Russian (${batch.length} total):
-${batch.map(m => `${m.author}: ${m.text.substring(0, 200)}`).join('\n')}
+    // Dynamic character budget: reserve space for prompt template and output
+    const PROMPT_OVERHEAD_TOKENS = 400;
+    const OUTPUT_RESERVE_TOKENS = 1500;
+    const CHARS_PER_TOKEN = 2; // Cyrillic: ~1 char per token; ×2 gives a safety margin for mixed content
+    const availableBudgetChars = (analyzer.contextLimit - PROMPT_OVERHEAD_TOKENS - OUTPUT_RESERVE_TOKENS) * CHARS_PER_TOKEN;
+
+    function buildBatchPrompt(msgs, batchLabel, totalBatches) {
+        const perMsg = msgs.length > 0 ? Math.floor(availableBudgetChars / msgs.length) : 200;
+        const charLimit = Math.max(40, perMsg);
+        return `You are analyzing Russian-language fintech community chat (batch ${batchLabel}/${totalBatches}).
+
+Messages in Russian (${msgs.length} total):
+${msgs.map(m => `${m.author}: ${m.text.substring(0, charLimit)}`).join('\n')}
 
 Extract ALL mentions in JSON format (field names in English, content values in Russian):
 {
@@ -643,10 +680,56 @@ Extract ALL mentions in JSON format (field names in English, content values in R
 }
 
 Be maximally detailed. Output JSON only, no explanations.`;
+    }
+    
+    for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        const batchNum = i + 1;
+        
+        process.stdout.write(`\r   Batch ${batchNum}/${batches.length} (${batch.length} messages)...`);
+        
+        const prompt = buildBatchPrompt(batch, batchNum, batches.length);
 
         const response = await analyzer.analyzeRaw(prompt);
         
-        const parsed = tryRepairJson(response);
+        let parsed = tryRepairJson(response);
+
+        // Retry once with a smaller/simplified prompt on parse failure
+        if (!parsed) {
+            const half = batch.slice(0, Math.ceil(batch.length / 2));
+            const retryPrompt = `Analyze this Russian fintech chat excerpt and return JSON only.
+
+Messages:
+${half.map(m => `${m.author}: ${m.text.substring(0, 80)}`).join('\n')}
+
+Return this exact JSON structure:
+{"products_mentioned":[],"pain_points":[],"topics":[],"questions":[],"key_insights":[]}
+
+JSON only, no explanations.`;
+
+            const retryRequestBody = {
+                messages: [{ role: 'user', content: retryPrompt }],
+                temperature: 0.1,
+                max_tokens: 1024,
+                response_format: { type: 'json_object' }
+            };
+            try {
+                const retryResponse = await fetch(`${analyzer.baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(retryRequestBody)
+                });
+                if (retryResponse.ok) {
+                    const retryData = await retryResponse.json();
+                    if (retryData.usage?.total_tokens !== 0) {
+                        parsed = tryRepairJson(retryData.choices[0].message.content);
+                    }
+                }
+            } catch (retryError) {
+                console.log(`\n      ⚠️  Batch ${batchNum}: Retry also failed — ${retryError.message}`);
+            }
+        }
+
         if (parsed) {
             batchAnalyses.push({
                 batchNumber: batchNum,
@@ -945,7 +1028,7 @@ async function exhaustiveMonthAnalysis(month, analyzer) {
     const startTime = Date.now();
     
     console.log('\n[1/4] Batch analysis (every message counted)...');
-    const batchAnalyses = await exhaustiveBatchAnalysis(month.messages, analyzer, 80);
+    const batchAnalyses = await exhaustiveBatchAnalysis(month.messages, analyzer, 40);
     
     console.log('\n[2/4] Aggregating into daily summaries...');
     const dailySummaries = aggregateBatchesToDays(batchAnalyses);
