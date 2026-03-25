@@ -416,7 +416,7 @@ Answer in Russian, be concise and factual.`;
     }
     
     async analyzeRaw(prompt) {
-        const estimatedInputTokens = Math.ceil(prompt.length / 2);
+        const estimatedInputTokens = Math.ceil(prompt.length);
         const availableTokens = this.contextLimit - estimatedInputTokens - 300; // 300 safety buffer
         const outputTokens = Math.min(4000, Math.max(512, availableTokens));
 
@@ -432,6 +432,13 @@ Answer in Russian, be concise and factual.`;
             max_tokens: outputTokens
         };
         if (isJsonOnlyRequest) {
+            requestBody.messages = [
+                {
+                    role: 'system',
+                    content: 'You are a JSON-only API. Output valid JSON only. No explanations, no markdown, no preamble, no text before or after the JSON object.'
+                },
+                { role: 'user', content: prompt }
+            ];
             requestBody.response_format = { type: 'json_object' };
         }
 
@@ -659,7 +666,7 @@ async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 80) {
     // Dynamic character budget: reserve space for prompt template and output
     const PROMPT_OVERHEAD_TOKENS = 400;
     const OUTPUT_RESERVE_TOKENS = 1500;
-    const CHARS_PER_TOKEN = 2; // Cyrillic: ~1 char per token; ×2 gives a safety margin for mixed content
+    const CHARS_PER_TOKEN = 1; // Cyrillic: ~1 char per token
     const availableBudgetChars = (analyzer.contextLimit - PROMPT_OVERHEAD_TOKENS - OUTPUT_RESERVE_TOKENS) * CHARS_PER_TOKEN;
 
     function buildBatchPrompt(msgs, batchLabel, totalBatches) {
@@ -708,7 +715,13 @@ Return this exact JSON structure:
 JSON only, no explanations.`;
 
             const retryRequestBody = {
-                messages: [{ role: 'user', content: retryPrompt }],
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a JSON-only API. Output valid JSON only. No explanations, no markdown, no preamble, no text before or after the JSON object.'
+                    },
+                    { role: 'user', content: retryPrompt }
+                ],
                 temperature: 0.1,
                 max_tokens: 1024,
                 response_format: { type: 'json_object' }
