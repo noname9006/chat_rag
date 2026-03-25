@@ -416,12 +416,14 @@ Answer in Russian, be concise and factual.`;
     }
     
     async analyzeRaw(prompt) {
-        const estimatedTokens = Math.floor(prompt.length / 2.5);
-        
-        if (estimatedTokens > this.contextLimit - 1500) {
-            console.warn(`⚠️  Prompt close to limit! (~${estimatedTokens} tokens)`);
+        const estimatedInputTokens = Math.ceil(prompt.length / 3.5);
+        const availableTokens = this.contextLimit - estimatedInputTokens - 300; // 300 safety buffer
+        const outputTokens = Math.min(4000, Math.max(512, availableTokens));
+
+        if (estimatedInputTokens > this.contextLimit - 1500) {
+            console.warn(`⚠️  Prompt close to limit! (~${estimatedInputTokens} tokens)`);
         }
-        
+
         try {
             const response = await fetch(`${this.baseUrl}/chat/completions`, {
                 method: 'POST',
@@ -429,7 +431,7 @@ Answer in Russian, be concise and factual.`;
                 body: JSON.stringify({
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.3,
-                    max_tokens: 2048
+                    max_tokens: outputTokens
                 })
             });
             
@@ -601,7 +603,7 @@ function tryRepairJson(raw) {
     return null;
 }
 
-async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 120) {
+async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 80) {
     console.log(`\n📊 Exhaustive analysis of ${messages.length} messages (batches of ${batchSize})`);
     
     const timeChunks = chunkByTime(messages, batchSize, 120);
@@ -629,7 +631,7 @@ async function exhaustiveBatchAnalysis(messages, analyzer, batchSize = 120) {
         const prompt = `You are analyzing Russian-language fintech community chat (batch ${batchNum}/${batches.length}).
 
 Messages in Russian (${batch.length} total):
-${batch.map(m => `${m.author}: ${m.text.substring(0, 300)}`).join('\n')}
+${batch.map(m => `${m.author}: ${m.text.substring(0, 200)}`).join('\n')}
 
 Extract ALL mentions in JSON format (field names in English, content values in Russian):
 {
@@ -943,7 +945,7 @@ async function exhaustiveMonthAnalysis(month, analyzer) {
     const startTime = Date.now();
     
     console.log('\n[1/4] Batch analysis (every message counted)...');
-    const batchAnalyses = await exhaustiveBatchAnalysis(month.messages, analyzer, 120);
+    const batchAnalyses = await exhaustiveBatchAnalysis(month.messages, analyzer, 80);
     
     console.log('\n[2/4] Aggregating into daily summaries...');
     const dailySummaries = aggregateBatchesToDays(batchAnalyses);
@@ -969,7 +971,7 @@ async function exhaustiveMonthAnalysis(month, analyzer) {
         dailySummaries: dailySummaries,
         weeklySummaries: weeklySummaries,
         monthSummary: monthSummary,
-        coverage: `${batchAnalyses.length * 120} messages analyzed (~${Math.round(batchAnalyses.length * 120 / month.messages.length * 100)}%)`
+        coverage: `${batchAnalyses.length * 80} messages analyzed (~${Math.round(batchAnalyses.length * 80 / month.messages.length * 100)}%)`
     };
 }
 
