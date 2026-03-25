@@ -439,7 +439,6 @@ Answer in Russian, be concise and factual.`;
                 },
                 { role: 'user', content: prompt }
             ];
-            requestBody.response_format = { type: 'json_object' };
         }
 
         try {
@@ -723,8 +722,7 @@ JSON only, no explanations.`;
                     { role: 'user', content: retryPrompt }
                 ],
                 temperature: 0.1,
-                max_tokens: 1024,
-                response_format: { type: 'json_object' }
+                max_tokens: 1024
             };
             try {
                 const retryResponse = await fetch(`${analyzer.baseUrl}/chat/completions`, {
