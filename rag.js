@@ -804,6 +804,7 @@ function aggregateBatchesToDays(batchAnalyses) {
         dayGroups[day].totalMessages += batch.messageCount;
         
         batch.data.products_mentioned?.forEach(p => {
+            if (!p || !p.name || typeof p.name !== 'string') return;
             const key = p.name.toLowerCase().trim();
             if (!key || key.length < 2) return;
             
