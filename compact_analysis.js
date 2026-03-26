@@ -1,8 +1,8 @@
 'use strict';
 
 // compact_analysis.js
-// LLM-assisted summarization of full_analysis.json → full_analysis_compact.md
-// CommonJS, Node.js >= 18, no external dependencies
+// Deterministic Markdown report from full_exhaustive_analysis.json or fast_analysis.json
+// CommonJS, Node.js >= 18, no external dependencies, no LLM required
 
 const fs = require('fs');
 const path = require('path');
@@ -11,23 +11,17 @@ const path = require('path');
 
 const args = process.argv.slice(2);
 
-const FLAG_DRY_RUN = args.includes('--dry-run');
+const FLAG_DRY_RUN   = args.includes('--dry-run');
+const FLAG_NO_WEEKLY = args.includes('--no-weekly');
 
-let llmUrl = 'http://localhost:1234/v1';
-let maxTokensPerSection = 1024;
+let topN = 10;
 
-// Track which indices are consumed as flag values so they aren't treated as file paths
 const consumedIndices = new Set();
 
 for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--url' && args[i + 1]) {
-        llmUrl = args[i + 1].replace(/\/$/, ''); // strip trailing slash
-        consumedIndices.add(i);
-        consumedIndices.add(i + 1);
-        i++;
-    } else if (args[i] === '--max-tokens' && args[i + 1]) {
+    if (args[i] === '--top-n' && args[i + 1]) {
         const n = parseInt(args[i + 1], 10);
-        if (!isNaN(n) && n > 0) maxTokensPerSection = n;
+        if (!isNaN(n) && n > 0) topN = n;
         consumedIndices.add(i);
         consumedIndices.add(i + 1);
         i++;
@@ -35,88 +29,273 @@ for (let i = 0; i < args.length; i++) {
 }
 
 const fileArgs = args.filter((a, idx) => !a.startsWith('--') && !consumedIndices.has(idx));
-const inputPath  = path.resolve(fileArgs[0] || 'full_analysis.json');
-const outputPath = path.resolve(fileArgs[1] || 'full_analysis_compact.md');
 
-// ─── LLM call ───────────────────────────────────────────────────────────────
-
-async function callLLM(prompt) {
-    const requestBody = {
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: maxTokensPerSection
-    };
-
-    let response;
-    try {
-        response = await fetch(`${llmUrl}/chat/completions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-    } catch (err) {
-        console.error(`\n❌  Cannot reach LM Studio at ${llmUrl}`);
-        console.error(`   ${err.message}`);
-        console.error('   Make sure LM Studio is running and its local server is started.');
-        process.exit(1);
-    }
-
-    if (!response.ok) {
-        console.error(`\n❌  LM Studio returned HTTP ${response.status}`);
-        process.exit(1);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content ?? '';
-    const totalTokens = data.usage?.total_tokens ?? '?';
-    return { content, totalTokens };
-}
-
-// ─── Prompt builder ──────────────────────────────────────────────────────────
-
-const MAX_JSON_CHARS = 6000;
-
-function buildPrompt(key, sectionValue) {
-    let jsonStr = JSON.stringify(sectionValue);
-    let truncated = false;
-    if (jsonStr.length > MAX_JSON_CHARS) {
-        // Truncate at character boundary — the result is intentionally not valid JSON;
-        // it is only fed to the LLM as context for summarization, not parsed.
-        jsonStr = jsonStr.slice(0, MAX_JSON_CHARS) + ' [truncated]';
-        truncated = true;
-    }
-
-    return `You are summarizing a section of a Telegram chat analysis report.
-
-Section name: "${key}"
-Section data (JSON)${truncated ? ' (truncated)' : ''}:
-${jsonStr}
-
-Write a concise, human-readable summary of this section in 3-8 sentences of clear English prose.
-Focus on the most important findings, numbers, and patterns.
-Do not repeat the raw data — synthesize it.
-If the data contains lists, highlight only the top items.
-Be factual and specific.`;
-}
-
-// ─── Markdown helpers ────────────────────────────────────────────────────────
-
-function toSectionTitle(key) {
-    // Convert snake_case / camelCase to Title Case
-    return key
-        .replace(/_/g, ' ')
-        .replace(/([a-z])([A-Z])/g, '$1 $2')
-        .replace(/\b\w/g, c => c.toUpperCase());
-}
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate() {
     return new Date().toISOString().slice(0, 10);
 }
 
+function mdTable(headers, rows) {
+    if (!rows || rows.length === 0) return '_No data._';
+    const header = '| ' + headers.join(' | ') + ' |';
+    const sep    = '|' + headers.map(() => '---|').join('');
+    const body   = rows.map(r => '| ' + r.join(' | ') + ' |').join('\n');
+    return [header, sep, body].join('\n');
+}
+
+// ─── Exhaustive format renderer ───────────────────────────────────────────────
+
+function renderExhaustive(data, opts) {
+    const { topN, noWeekly } = opts;
+    const lines = [];
+
+    lines.push('# Exhaustive Analysis — Compact Report');
+    lines.push(`_Generated: ${formatDate()}_`);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+
+    // Overview
+    lines.push('## 📊 Overview');
+    lines.push(`- Analysis date: ${data.analysisDate ? data.analysisDate.slice(0, 10) : formatDate()}`);
+    lines.push(`- Total duration: ${data.totalDuration || 'n/a'}`);
+    lines.push(`- Total months: ${data.summary?.totalMonths ?? data.monthly?.length ?? 'n/a'}`);
+    lines.push(`- Total messages: ${data.summary?.totalMessages ?? 'n/a'}`);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+
+    // Global Summary
+    const gs = data.globalSummary;
+    if (gs) {
+        lines.push('## 🌍 Global Summary');
+        lines.push('');
+        if (gs.overall_narrative) {
+            lines.push(gs.overall_narrative);
+            lines.push('');
+        }
+
+        if (gs.most_discussed_products && gs.most_discussed_products.length > 0) {
+            lines.push('**Most discussed products:**');
+            lines.push(mdTable(
+                ['Product', 'Why popular'],
+                gs.most_discussed_products.slice(0, topN).map(p => [p.name || '', p.why || ''])
+            ));
+            lines.push('');
+        }
+
+        if (gs.persistent_issues && gs.persistent_issues.length > 0) {
+            lines.push('**Persistent issues:**');
+            gs.persistent_issues.forEach(issue => lines.push(`- ${issue}`));
+            lines.push('');
+        }
+
+        if (gs.community_evolution) {
+            lines.push('**Community evolution:**');
+            lines.push(gs.community_evolution);
+            lines.push('');
+        }
+
+        if (gs.key_milestones && gs.key_milestones.length > 0) {
+            lines.push('**Key milestones:**');
+            gs.key_milestones.forEach(m => lines.push(`- ${m}`));
+            lines.push('');
+        }
+
+        lines.push('---');
+        lines.push('');
+    }
+
+    // Monthly Summaries
+    if (data.monthly && data.monthly.length > 0) {
+        lines.push('## 📅 Monthly Summaries');
+        lines.push('');
+
+        for (const month of data.monthly) {
+            const ms = month.monthSummary;
+            lines.push(`### ${month.monthLabel} (${month.totalMessages} messages)`);
+            lines.push('');
+
+            if (ms) {
+                if (ms.executive_summary) {
+                    lines.push(ms.executive_summary);
+                    lines.push('');
+                }
+
+                if (ms.top_products_month && ms.top_products_month.length > 0) {
+                    const topProds = ms.top_products_month.slice(0, topN)
+                        .map(p => `${p.name} (${p.sentiment || 'n/a'})`)
+                        .join(', ');
+                    lines.push(`**Top products:** ${topProds}`);
+                }
+
+                if (ms.major_issues && ms.major_issues.length > 0) {
+                    lines.push(`**Major issues:** ${ms.major_issues.slice(0, topN).join(', ')}`);
+                }
+
+                if (ms.month_mood) {
+                    lines.push(`**Mood:** ${ms.month_mood}`);
+                }
+                lines.push('');
+            }
+
+            // Weekly summaries
+            if (!noWeekly && month.weeklySummaries && month.weeklySummaries.length > 0) {
+                for (const week of month.weeklySummaries) {
+                    const ws = week.weekSummary;
+                    if (!ws) continue;
+                    lines.push(`#### Week ${week.week || ''} (${week.totalMessages || 0} messages)`);
+                    lines.push('');
+                    if (ws.week_narrative) {
+                        lines.push(ws.week_narrative);
+                        lines.push('');
+                    }
+                    if (ws.top_products && ws.top_products.length > 0) {
+                        lines.push(`**Top products:** ${ws.top_products.slice(0, topN).map(p => `${p.name} (${p.sentiment || 'n/a'})`).join(', ')}`);
+                    }
+                    if (ws.key_issues && ws.key_issues.length > 0) {
+                        lines.push(`**Key issues:** ${ws.key_issues.slice(0, topN).join(', ')}`);
+                    }
+                    lines.push('');
+                }
+            }
+
+            lines.push('---');
+            lines.push('');
+        }
+    }
+
+    // Aggregated sections
+    renderAggregated(lines, data.aggregated, topN);
+
+    return lines.join('\n');
+}
+
+// ─── Fast format renderer ─────────────────────────────────────────────────────
+
+function renderFast(data, opts) {
+    const { topN } = opts;
+    const lines = [];
+
+    lines.push('# Fast Analysis — Compact Report');
+    lines.push(`_Generated: ${formatDate()}_`);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+
+    // Overview
+    lines.push('## 📊 Overview');
+    lines.push(`- Analysis date: ${data.analysisDate ? data.analysisDate.slice(0, 10) : formatDate()}`);
+    lines.push(`- Total months: ${data.monthly?.length ?? 'n/a'}`);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+
+    // Monthly Summaries
+    if (data.monthly && data.monthly.length > 0) {
+        lines.push('## 📅 Monthly Summaries');
+        lines.push('');
+
+        for (const month of data.monthly) {
+            lines.push(`### ${month.monthLabel} (${month.totalMessages || month.messages?.length || 0} messages)`);
+            lines.push('');
+
+            const ins = month.insights;
+            if (ins) {
+                if (ins.key_insights && ins.key_insights.length > 0) {
+                    ins.key_insights.forEach(i => lines.push(`- ${i}`));
+                    lines.push('');
+                }
+
+                if (ins.products_mentioned && ins.products_mentioned.length > 0) {
+                    const prods = ins.products_mentioned.slice(0, topN)
+                        .map(p => `${p.name} (${p.sentiment || 'n/a'})`)
+                        .join(', ');
+                    lines.push(`**Products:** ${prods}`);
+                }
+
+                if (ins.pain_points && ins.pain_points.length > 0) {
+                    lines.push(`**Pain points:** ${ins.pain_points.slice(0, topN).join(', ')}`);
+                }
+
+                if (ins.overall_mood) {
+                    lines.push(`**Mood:** ${ins.overall_mood}`);
+                }
+                lines.push('');
+            }
+
+            lines.push('---');
+            lines.push('');
+        }
+    }
+
+    // Aggregated sections
+    renderAggregated(lines, data.aggregated, topN);
+
+    return lines.join('\n');
+}
+
+// ─── Shared aggregated renderer ───────────────────────────────────────────────
+
+function renderAggregated(lines, aggregated, topN) {
+    if (!aggregated) return;
+
+    if (aggregated.topProducts && aggregated.topProducts.length > 0) {
+        lines.push('## 📈 Aggregated: Top Products');
+        lines.push('');
+        lines.push(mdTable(
+            ['Product', 'Mentions', 'Sentiment'],
+            aggregated.topProducts.slice(0, topN).map(p => [
+                p.name || '',
+                String(p.totalMentions ?? p.mentions ?? ''),
+                p.avgSentiment || p.sentiment || ''
+            ])
+        ));
+        lines.push('');
+    }
+
+    if (aggregated.topPainPoints && aggregated.topPainPoints.length > 0) {
+        lines.push('## 🔥 Aggregated: Top Pain Points');
+        lines.push('');
+        lines.push(mdTable(
+            ['Issue', 'Frequency'],
+            aggregated.topPainPoints.slice(0, topN).map(p => [
+                p.issue || p.name || '',
+                String(p.frequency ?? p.count ?? '')
+            ])
+        ));
+        lines.push('');
+    }
+
+    if (aggregated.topTopics && aggregated.topTopics.length > 0) {
+        lines.push('## 💬 Aggregated: Top Topics');
+        lines.push('');
+        lines.push(mdTable(
+            ['Topic', 'Count'],
+            aggregated.topTopics.slice(0, topN).map(t => [
+                t.topic || t.name || '',
+                String(t.count ?? t.frequency ?? '')
+            ])
+        ));
+        lines.push('');
+    }
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-async function main() {
-    // 1. Read JSON
+function main() {
+    // Resolve input/output paths
+    const defaultInput = fs.existsSync('full_exhaustive_analysis.json')
+        ? 'full_exhaustive_analysis.json'
+        : 'fast_analysis.json';
+
+    const inputPath = path.resolve(fileArgs[0] || defaultInput);
+
+    const inputBase = path.basename(inputPath, '.json');
+    const outputPath = path.resolve(fileArgs[1] || `${inputBase}_compact.md`);
+
+    // Read JSON
     if (!fs.existsSync(inputPath)) {
         console.error(`❌  Input file not found: ${inputPath}`);
         process.exit(1);
@@ -124,72 +303,37 @@ async function main() {
 
     const fileSizeBytes = fs.statSync(inputPath).size;
     const fileSizeMB = (fileSizeBytes / 1024 / 1024).toFixed(1);
-    process.stdout.write(`📂 Reading ${path.basename(inputPath)} (${fileSizeMB} MB)...\n`);
+    console.log(`📂 Reading ${path.basename(inputPath)} (${fileSizeMB} MB)...`);
 
-    let analysis;
+    let data;
     try {
-        const raw = fs.readFileSync(inputPath, 'utf8');
-        analysis = JSON.parse(raw);
+        data = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
     } catch (err) {
         console.error(`❌  Failed to parse JSON: ${err.message}`);
         process.exit(1);
     }
 
-    const keys = Object.keys(analysis);
-    console.log(`✅ JSON parsed. Found ${keys.length} top-level sections.\n`);
+    const isExhaustive = data.analysisType === 'exhaustive' || !!data.globalSummary;
+    console.log(`✅ Format detected: ${isExhaustive ? 'exhaustive' : 'fast'}`);
+    console.log(`   Months: ${data.monthly?.length ?? 0}, topN: ${topN}, no-weekly: ${FLAG_NO_WEEKLY}`);
+
+    const opts = { topN, noWeekly: FLAG_NO_WEEKLY };
+    const markdown = isExhaustive
+        ? renderExhaustive(data, opts)
+        : renderFast(data, opts);
 
     if (FLAG_DRY_RUN) {
-        console.log('🔍 Dry-run mode — printing prompts without calling LLM.\n');
+        console.log('\n🔍 Dry-run mode — output preview:\n');
         console.log('─'.repeat(60));
+        console.log(markdown.slice(0, 2000) + (markdown.length > 2000 ? '\n... [truncated for preview]' : ''));
+        console.log('─'.repeat(60));
+        console.log('\nDry-run complete. File not written.');
+        return;
     }
 
-    // 2. Process each section
-    const sections = [];
-
-    for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        const label = `[${i + 1}/${keys.length}]`;
-        process.stdout.write(`🤖 Processing section ${label}: ${key}...\n`);
-
-        const prompt = buildPrompt(key, analysis[key]);
-
-        if (FLAG_DRY_RUN) {
-            console.log(`\n--- PROMPT for "${key}" ---`);
-            console.log(prompt);
-            console.log('─'.repeat(60) + '\n');
-            sections.push({ key, content: `_(dry-run — no LLM output)_` });
-            continue;
-        }
-
-        const { content, totalTokens } = await callLLM(prompt);
-        console.log(`   ✅ Done (${totalTokens} tokens)`);
-        sections.push({ key, content });
-    }
-
-    // 3. Build Markdown document
-    const lines = [
-        `# full_analysis — Compact Analysis Report`,
-        `_Generated: ${formatDate()} · LLM-assisted summary_`,
-        '',
-        '---',
-        ''
-    ];
-
-    for (const { key, content } of sections) {
-        lines.push(`## ${toSectionTitle(key)}`);
-        lines.push('');
-        lines.push(content.trim());
-        lines.push('');
-        lines.push('---');
-        lines.push('');
-    }
-
-    const markdown = lines.join('\n');
     fs.writeFileSync(outputPath, markdown, 'utf8');
-
     const outKB = (Buffer.byteLength(markdown, 'utf8') / 1024).toFixed(1);
     console.log(`\n✅ Compact report written to ${path.basename(outputPath)} (${outKB} KB)`);
-    console.log('Done.');
 }
 
 main();

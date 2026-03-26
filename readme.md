@@ -88,14 +88,22 @@ npm run analysis:fast
 ### Interactive Mode (Ask Questions)
 ```bash
 npm start
-# or
-npm run interactive
+# or with explicit mode
+node rag.js --mode=simple
+node rag.js --mode=adaptive
+node rag.js --mode=twopass
 ```
 
-**Features:**
-- Semantic search across entire chat history
-- Ask natural language questions
-- LLM-powered answers with context
+**Search modes:**
+- `simple` — single semantic query, fast
+- `adaptive` — adjusts search strategy based on question complexity
+- `twopass` — two-stage search for deeper context retrieval
+
+**Commands inside interactive session:**
+- `/mode simple` — switch to simple mode
+- `/mode adaptive` — switch to adaptive mode
+- `/mode twopass` — switch to two-pass mode
+- `exit` — quit
 
 **Example queries:**
 - "What do people say about Revolut?"
@@ -103,11 +111,15 @@ npm run interactive
 - "Who recommended Interactive Brokers and why?"
 - "What tax-related issues were discussed?"
 
+> **Note:** Interactive mode works independently from exhaustive analysis — it uses the vector index (chunks), not `full_exhaustive_analysis.json`. You can run interactive queries while exhaustive analysis is running, or after it completes.
+
 ## Project Structure
 ```
 telegram-chat-rag-analyzer/
 ├── package.json              # Dependencies and scripts
 ├── rag.js                    # Main application
+├── compact_analysis.js       # Compact Markdown report generator (no LLM)
+├── convert_to_doc.js         # Convert analysis JSON to documents
 ├── README.md                 # This file
 ├── chat_export.json          # Your Telegram export (place here)
 ├── chat_index_chunks/        # Vector index (auto-generated)
@@ -118,6 +130,33 @@ telegram-chat-rag-analyzer/
 ├── full_exhaustive_analysis.json  # Exhaustive analysis output
 └── fast_analysis.json             # Fast analysis output
 ```
+
+## Post-processing Tools
+
+### Compact Report (no LLM required)
+```bash
+npm run compact
+```
+
+Converts `full_exhaustive_analysis.json` or `fast_analysis.json` to a concise Markdown report.
+No LLM needed — pure deterministic transformation.
+
+**Options:**
+- `--top-n N` — number of items in aggregated lists (default: 10)
+- `--no-weekly` — skip weekly summaries in monthly sections
+- `--dry-run` — preview without writing file
+
+**Output:** `full_exhaustive_analysis_compact.md`
+
+### Convert to Document
+```bash
+npm run convert          # Full Markdown
+npm run convert:summary  # Highlights only
+npm run convert:html     # Interactive HTML (collapsible sections)
+npm run convert:all      # All three formats
+```
+
+Converts analysis JSON to human-readable documents. Works with both exhaustive and fast analysis output.
 
 ## Output Format
 
@@ -134,11 +173,21 @@ telegram-chat-rag-analyzer/
   },
   "monthly": [
     {
-      "month": "2023-08",
+      "monthLabel": "2023-08",
       "totalMessages": 5234,
-      "batches": [...],
-      "dailySummaries": [...],
-      "weeklySummaries": [...],
+      "analysisTime": "30 minutes",
+      "coverage": "5280 messages analyzed (~100%)",
+      "weeklySummaries": [
+        {
+          "week": "2023-08-W1",
+          "totalMessages": 1200,
+          "weekSummary": {
+            "week_narrative": "...",
+            "top_products": [...],
+            "key_issues": [...]
+          }
+        }
+      ],
       "monthSummary": {
         "executive_summary": "...",
         "top_products_month": [...],
@@ -191,16 +240,16 @@ const analyzer = new LMStudioAnalyzer('http://localhost:1234/v1', 12288);
 
 ### Change Batch Size
 
-Edit `rag.js` line in `exhaustiveBatchAnalysis`:
+Edit `rag.js` line in `exhaustiveMonthAnalysis`:
 ```javascript
-const batchAnalyses = await exhaustiveBatchAnalysis(month.messages, analyzer, 120);
-//                                                                              ↑
-//                                                                     Adjust batch size
+const batchAnalyses = await exhaustiveBatchAnalysis(month.messages, analyzer, 40);
+//                                                                             ↑
+//                                                                    Adjust batch size
 ```
 
 **Trade-offs:**
-- Larger batches (150-200): Faster analysis, less granular
-- Smaller batches (80-100): Slower analysis, more detailed
+- Larger batches (80-120): Faster analysis, less granular
+- Smaller batches (20-30): Slower analysis, more detailed
 
 ### Change LM Studio URL
 
@@ -267,7 +316,28 @@ Dataset too large for single JSON. Code automatically uses chunked storage, but 
 |----------|------------------|----------|----------|----------|
 | **Exhaustive** | 6-8 hours | ⭐⭐⭐⭐⭐ | 100% | Final reports, maximum accuracy |
 | **Fast** | 30-60 minutes | ⭐⭐⭐⭐ | ~5% sampled | Quick insights, exploration |
-| **Interactive** | Per query | ⭐⭐⭐⭐ | Relevant only | Specific questions, deep dives |
+| **Interactive** | Per query | ⭐⭐⭐⭐ | Relevant only | Specific questions, deep dives (uses vector index, independent of exhaustive) |
+
+## Recommended Workflow
+
+```bash
+# 1. First run: build the vector index
+npm run build-index
+
+# 2. Optional: quick overview (30–60 min)
+npm run analysis:fast
+
+# 3. Full analysis overnight (6–8 hours)
+npm run analysis:exhaustive
+
+# 4. Generate compact report (seconds, no LLM)
+npm run compact
+
+# 5. Interactive deep-dive: ask specific questions
+npm start
+```
+
+The interactive mode and exhaustive analysis are **independent** — interactive uses the vector index (chunks), exhaustive uses LLM batch processing. You can run interactive queries while exhaustive analysis is running, or after it completes.
 
 ## Use Cases
 
@@ -326,18 +396,3 @@ MIT License - use freely, no attribution required.
 **Author:** Evggen  
 **Version:** 3.0.0  
 **Last Updated:** March 2026
-```
-
----
-
-## Готово! 🚀
-
-Вот что получилось:
-
-### Структура файлов:
-```
-telegram-chat-rag-analyzer/
-├── package.json                 ✅ (dependencies + scripts)
-├── rag.js                      ✅ (full application ~1000 lines)
-├── README.md                   ✅ (comprehensive documentation)
-└── chat_export.json            (place your file here)
