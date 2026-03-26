@@ -10,7 +10,8 @@
     "interactive": "node rag.js --interactive",
     "analysis:exhaustive": "node rag.js --exhaustive",
     "analysis:fast": "node rag.js --fast",
-    "rebuild": "node rag.js --rebuild"
+    "rebuild": "node rag.js --rebuild",
+    "convert": "node convert_to_doc.js"
   },
   "keywords": [
     "rag",
