@@ -1,9 +1,9 @@
 'use strict';
-// convert_to_doc.js — Converts full_analysis.json to human-readable documents.
+// convert_to_doc.js — Converts full_exhaustive_analysis.json to human-readable documents.
 // Usage:
-//   node convert_to_doc.js                   # full_analysis.json → full_analysis.md (full)
-//   node convert_to_doc.js --summary         # → full_analysis_summary.md (highlights only)
-//   node convert_to_doc.js --html            # → full_analysis.html (interactive)
+//   node convert_to_doc.js                   # full_exhaustive_analysis.json → full_exhaustive_analysis.md (full)
+//   node convert_to_doc.js --summary         # → full_exhaustive_analysis_summary.md (highlights only)
+//   node convert_to_doc.js --html            # → full_exhaustive_analysis.html (interactive)
 //   node convert_to_doc.js --all             # all three outputs
 //   node convert_to_doc.js input.json        # custom input file, full Markdown output
 
@@ -18,7 +18,7 @@ const FLAG_ALL     = args.includes('--all');
 
 // Non-flag arguments are treated as file paths
 const fileArgs = args.filter(a => !a.startsWith('--'));
-const inputPath  = fileArgs[0] || 'full_analysis.json';
+const inputPath  = fileArgs[0] || 'full_exhaustive_analysis.json';
 
 const MAX_DEPTH = 10;
 const BLOCKQUOTE_THRESHOLD = 200;
