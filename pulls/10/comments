@@ -1,0 +1,51 @@
+## Updated requirements from user
+
+Please expand the scope of `convert_to_doc.js` to produce **three outputs** instead of one:
+
+---
+
+### 1. Full Markdown doc (`full_analysis.md`)
+As originally specified — full dynamic walk of the JSON, all sections.
+
+---
+
+### 2. Concise summary Markdown (`full_analysis_summary.md`)
+A short ~5–10 page highlights-only doc. Extract only:
+- **Top-level stats**: total messages, date range, chat name, participant count
+- **Top 10 topics** by frequency/relevance only (truncate the rest)
+- **Top 10 most active participants** by message count (truncate the rest)
+- **Key insights**: maximum 10 items (first 10 or highest-scored)
+- **Monthly timeline**: full monthly message counts table (grouped by YYYY-MM, no day/week breakdown)
+- **Top reacted messages**: top 5 messages by total reaction count
+
+Keep it tight — skip raw chunks, Q&A threads, and verbose sub-arrays. Aim for under 500 lines.
+
+---
+
+### 3. Interactive HTML file (`full_analysis.html`)
+A self-contained single HTML file (no external dependencies, inline CSS only) with:
+- A clean, readable page style (font, spacing, subtle colors)
+- Every top-level section rendered as a `<details><summary>` collapsible panel — collapsed by default
+- Tables for arrays of objects (topics, participants, timeline)
+- Bullet lists for arrays of strings
+- Long text in `<blockquote>` style
+- A "Expand All / Collapse All" toggle button (pure JS, no libraries)
+- A sticky header showing the chat name and generation date
+- Monthly timeline as a proper HTML table
+
+---
+
+### Updated `package.json` scripts
+```json
+"convert": "node convert_to_doc.js",
+"convert:summary": "node convert_to_doc.js --summary",
+"convert:html": "node convert_to_doc.js --html",
+"convert:all": "node convert_to_doc.js --all"
+```
+
+The script should accept `--summary`, `--html`, `--all` flags to control which outputs are generated. Default (no flag) = full Markdown only.
+
+---
+
+### Timeline note (from earlier)
+The Timeline section must only show **monthly** granularity (grouped as `YYYY-MM`). No day or week breakdowns.
