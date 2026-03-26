@@ -11,7 +11,10 @@
     "analysis:exhaustive": "node rag.js --exhaustive",
     "analysis:fast": "node rag.js --fast",
     "rebuild": "node rag.js --rebuild",
-    "convert": "node convert_to_doc.js"
+    "convert": "node convert_to_doc.js",
+    "convert:summary": "node convert_to_doc.js --summary",
+    "convert:html": "node convert_to_doc.js --html",
+    "convert:all": "node convert_to_doc.js --all"
   },
   "keywords": [
     "rag",
