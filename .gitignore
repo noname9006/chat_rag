@@ -1,0 +1,9 @@
+node_modules/
+chat_index_chunks/
+chat_export.json
+full_analysis.json
+full_analysis.md
+fast_analysis.json
+full_exhaustive_analysis.json
+*.env
+.env*
