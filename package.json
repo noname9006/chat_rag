@@ -14,7 +14,9 @@
     "convert": "node convert_to_doc.js",
     "convert:summary": "node convert_to_doc.js --summary",
     "convert:html": "node convert_to_doc.js --html",
-    "convert:all": "node convert_to_doc.js --all"
+    "convert:all": "node convert_to_doc.js --all",
+    "compact": "node compact_analysis.js",
+    "compact:dry": "node compact_analysis.js --dry-run"
   },
   "keywords": [
     "rag",
