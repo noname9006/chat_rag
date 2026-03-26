@@ -1168,9 +1168,16 @@ async function fullExhaustiveAnalysis(messages, analyzer) {
         summary: {
             totalMonths: monthlyGroups.length,
             totalMessages: messages.length,
-            totalBatches: monthlyAnalyses.reduce((sum, m) => sum + m.batches.length, 0)
+            totalBatches: monthlyAnalyses.reduce((sum, m) => sum + (m.batches?.length ?? 0), 0)
         },
-        monthly: monthlyAnalyses,
+        monthly: monthlyAnalyses.map(m => ({
+            monthLabel:      m.monthLabel,
+            totalMessages:   m.totalMessages,
+            analysisTime:    m.analysisTime,
+            coverage:        m.coverage,
+            weeklySummaries: m.weeklySummaries,
+            monthSummary:    m.monthSummary,
+        })),
         aggregated: aggregated,
         globalSummary: globalSummary
     }, null, 2));
@@ -1226,7 +1233,7 @@ function displayExhaustiveResults(monthlyAnalyses, aggregated, globalSummary, du
     console.log(`\n⏱️  Total time: ${duration} minutes (${(duration/60).toFixed(1)} hours)`);
     console.log(`📊 Months analyzed: ${monthlyAnalyses.length}`);
     console.log(`📨 Total messages: ${monthlyAnalyses.reduce((sum, m) => sum + m.totalMessages, 0)}`);
-    console.log(`📦 Total batches: ${monthlyAnalyses.reduce((sum, m) => sum + m.batches.length, 0)}`);
+    console.log(`📦 Total batches: ${monthlyAnalyses.reduce((sum, m) => sum + (m.batches?.length ?? 0), 0)}`);
     
     if (globalSummary) {
         console.log(`\n📖 Community history:`);
